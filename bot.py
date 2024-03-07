@@ -19,7 +19,7 @@ intents.dm_messages = True
 intents.moderation = False
 intents.message_content = True
 
-bot = commands.Bot(command_prefix='!', intents=intents, sync_commands=True, sync_commands_debug=True)
+bot = commands.Bot(command_prefix='?', intents=intents, sync_commands=True, sync_commands_debug=True)
 
 
 @bot.event
@@ -31,7 +31,7 @@ async def on_ready():
     print(f'ID: {bot.user.id}')
 
     # Set the activity
-    await bot.change_presence(activity=discord.Game(name="!help"))
+    await bot.change_presence(activity=discord.Game(name="?help"))
 
     # Add the commands to the bot
     await bot.tree.sync()
@@ -41,6 +41,7 @@ async def ping(ctx):
     """
     Command to check if the bot is online.
     """
+    print(f"{ctx.author} used /ping command in {ctx.channel} on {ctx.guild}.")
     await ctx.send(f'Pong! {round(bot.latency * 1000)}ms', ephemeral=True)
 
 @bot.hybrid_command(ephemeral=True)
@@ -73,6 +74,7 @@ async def about(ctx):
 @app_commands.describe(name="The name of the composition", phone="The phone for the composition")
 @app_commands.choices(phone=[Choice(name="NP1", value="A063"), Choice(name="NP2", value="A065"), Choice(name="NP2a", value="A142")])
 async def upload_composition(ctx, name: str, phone: str):
+    print(f"{ctx.author} used /upload_composition command in {ctx.channel} on {ctx.guild}.")
     await ctx.send(f"Option: {phone}, Name: {name}", ephemeral=True)
 
 # Run the bot
