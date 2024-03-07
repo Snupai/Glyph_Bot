@@ -3,6 +3,9 @@ from discord.ext import commands
 from discord.ui import Button, View
 from dotenv import load_dotenv
 import os
+import youtube_dl
+import subprocess
+
 
 make_ephemeral = False
 
@@ -90,6 +93,55 @@ async def help(ctx):
 
     # Send the embed
     await ctx.respond(embed=embed, ephemeral=make_ephemeral)
+
+@bot.slash_command(name="dl_trim", description="Plays audio from a URL at a specific time")
+async def dl_trim(ctx,
+                     url: str = discord.commands.Option(name="audio_url", description="The audio file URL", required=True),
+                     begin: float = discord.commands.option(name="start_time", description="The time to start playing the audio in seconds", default=0.0),
+                     end: float = discord.commands.option(name="end_time", description="The time to stop playing the audio in seconds", default=None)):
+    """
+    Command to play audio from a URL at a specific time.
+    """
+    print(f"{ctx.author} used /dl_trim command in {ctx.channel} on {ctx.guild}.")
+    
+    # acknowledge the command without sending a response
+    await ctx.defer()
+    
+    ydl = youtube_dl.YoutubeDL()
+    info = ydl.extract_info(url, download=False)
+    if end is None:
+        end = info['duration']
+    title = info['title']
+
+    # use youtube-dl to download the audio file from the url and trim it to the specified time range
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'outtmpl': '%(title)s.%(ext)s', #'%(title)s.%(id)s.%(ext)s',
+        'restrictfilenames': True,
+        'noplaylist': True,
+        'quiet': True,
+        'no_warnings': True,
+        'nooverwrites': True,
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'opus',
+            'preferredquality': '192',
+        }],
+    }
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([url])
+
+    # run the ffmpeg command to trim the audio file "ffmpeg -i Shoyu.opus -ab 189k -ss 8.0 -t 110.0 -acodec libopus Shoyu.ogg"
+    subprocess.run(['ffmpeg', '-i', f'{title}.opus', '-ab', '189k', '-ss', str(begin), '-t', str(end-begin), '-acodec', 'libopus', f'{title}.ogg'])
+
+    os.remove(f'{title}.opus')
+    
+    # send the audio file
+    await ctx.respond(content="Here's your audio! Enjoy! 🎵", file=discord.File(f'{title}.ogg'))
+
+    # delete the audio file
+    os.remove(f'{title}.ogg')
+
 
 
 
