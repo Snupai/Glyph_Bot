@@ -3,8 +3,8 @@ from discord.ext import commands
 from discord.ui import Button, View
 from dotenv import load_dotenv
 import os
-from discord.app_commands import Choice
-from discord import app_commands
+
+make_ephemeral = False
 
 # Load the environment variables from .env file
 load_dotenv()
@@ -19,7 +19,7 @@ intents.dm_messages = True
 intents.moderation = False
 intents.message_content = True
 
-bot = commands.Bot(command_prefix='?', intents=intents, sync_commands=True, sync_commands_debug=True)
+bot = commands.Bot(command_prefix='?', intents=intents, sync_commands=True, help_command=None)
 
 
 @bot.event
@@ -31,20 +31,20 @@ async def on_ready():
     print(f'ID: {bot.user.id}')
 
     # Set the activity
-    await bot.change_presence(activity=discord.Game(name="?help"))
+    await bot.change_presence(activity=discord.Game(name="/help"))
 
-    # Add the commands to the bot
-    await bot.tree.sync()
+    # delete all commands and recreate them
+    await bot.sync_commands()
 
-@bot.hybrid_command(ephemeral=True)
+@bot.slash_command()
 async def ping(ctx):
     """
     Command to check if the bot is online.
     """
     print(f"{ctx.author} used /ping command in {ctx.channel} on {ctx.guild}.")
-    await ctx.send(f'Pong! {round(bot.latency * 1000)}ms', ephemeral=True)
+    await ctx.respond(f'Pong! {round(bot.latency * 1000)}ms', ephemeral=make_ephemeral)
 
-@bot.hybrid_command(ephemeral=True)
+@bot.slash_command()
 async def about(ctx):
     """
     Command to display information about the bot.
@@ -68,16 +68,39 @@ async def about(ctx):
     row.add_item(button2)
 
     # Add the button row to the embed
-    await ctx.send(embed=embed, view=row, ephemeral=True)
+    await ctx.respond(embed=embed, view=row, ephemeral=make_ephemeral)
+    
+@bot.slash_command(name="help")
+async def help(ctx):
+    """
+    Command to display the help message.
+    """
+    print(f"{ctx.author} used /help command in {ctx.channel} on {ctx.guild}.")
 
-@bot.hybrid_command(ephemeral=True)
-@app_commands.describe(name="The name of the composition", phone="The phone for the composition")
-@app_commands.choices(phone=[Choice(name="NP1", value="A063"), Choice(name="NP2", value="A065"), Choice(name="NP2a", value="A142")])
-async def upload_composition(ctx, name: str, phone: str):
-    print(f"{ctx.author} used /upload_composition command in {ctx.channel} on {ctx.guild}.")
-    await ctx.send(f"Option: {phone}, Name: {name}", ephemeral=True)
+    # Create an embed
+    embed = discord.Embed(title="Help")
+    embed.description = "This bot provides an easy interface for the Custom Glyph tools. You can use the following commands to create and visualize custom glyphs:"
+    embed.add_field(name="/ping", value="Check if the bot is online.", inline=False)
+    embed.add_field(name="/about", value="Display information about the bot.", inline=False)
+    embed.add_field(name="/create", value="Create a custom glyph.", inline=False)
+    embed.add_field(name="/visualize", value="Visualize a custom glyph.", inline=False)
+    embed.add_field(name="/publish", value="Publish a custom glyph to our database.", inline=False)
+    embed.add_field(name="/search", value="Search for a custom glyph.", inline=False)
+    embed.add_field(name="/help", value="Display this help message.", inline=False)
+
+    # Send the embed
+    await ctx.respond(embed=embed, ephemeral=make_ephemeral)
+
+
+
+
+ # Cooldown Management
+@bot.event
+async def on_application_command_error(ctx, error):
+    if isinstance(error, commands.CommandOnCooldown):
+        await ctx.send(error)
+    else:
+        raise error
 
 # Run the bot
 bot.run(os.getenv('BOT_TOKEN'))
-
-
