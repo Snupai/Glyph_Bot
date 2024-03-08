@@ -132,7 +132,7 @@ async def dl_trim(ctx,
         ydl.download([url])
 
     # run the ffmpeg command to trim the audio file "ffmpeg -i Shoyu.opus -ab 189k -ss 8.0 -t 110.0 -acodec libopus Shoyu.ogg"
-    subprocess.run(['ffmpeg', '-i', f'{title}.opus', '-ab', '189k', '-ss', str(begin), '-t', str(end-begin), '-acodec', 'libopus', f'{title}.ogg'])
+    subprocess.run(['ffmpeg', '-i', f'{title}.opus', '-ab', '192k', '-ss', str(begin), '-t', str(end-begin), '-acodec', 'libopus', f'{title}.ogg'])
 
     os.remove(f'{title}.opus')
     
