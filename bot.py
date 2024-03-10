@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 import os
 import yt_dlp as youtube_dl
 import subprocess
+import datetime
 
 make_ephemeral = False
 
@@ -22,12 +23,15 @@ intents.message_content = True
 
 bot = commands.Bot(intents=intents, sync_commands=False, help_command=None)
 
-# Create a logger
+# Create a logger with timestamp in the file name
+
+timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+log_file = f"bot_{timestamp}.log"
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 # Create a file handler and set the log level
-file_handler = logging.FileHandler('bot.log')
+file_handler = logging.FileHandler(log_file)
 file_handler.setLevel(logging.INFO)
 
 # Create a formatter and add it to the file handler
