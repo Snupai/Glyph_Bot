@@ -1,3 +1,4 @@
 python-dotenv
 py-cord
-youtube_dl
+yt_dlp
+validators
