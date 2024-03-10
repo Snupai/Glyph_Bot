@@ -1,9 +1,12 @@
+from pathlib import Path
+import uuid
+import validators
 import discord
 from discord.ext import commands
 from discord.ui import Button, View
 from dotenv import load_dotenv
 import os
-import youtube_dl
+import yt_dlp as youtube_dl
 import subprocess
 
 
@@ -96,9 +99,9 @@ async def help(ctx):
 
 @bot.slash_command(name="dl_trim", description="Plays audio from a URL at a specific time")
 async def dl_trim(ctx,
-                     url: str = discord.commands.Option(name="audio_url", description="The audio file URL", required=True),
-                     begin: float = discord.commands.option(name="start_time", description="The time to start playing the audio in seconds", default=0.0),
-                     end: float = discord.commands.option(name="end_time", description="The time to stop playing the audio in seconds", default=None)):
+                   url: str = discord.commands.Option(name="audio_url", description="The audio file URL", required=True),
+                   begin: float = discord.commands.option(name="start_time", description="The time to start playing the audio in seconds", default=0.0),
+                   end: float = discord.commands.option(name="end_time", description="The time to stop playing the audio in seconds", default=None)):
     """
     Command to play audio from a URL at a specific time.
     """
@@ -107,16 +110,36 @@ async def dl_trim(ctx,
     # acknowledge the command without sending a response
     await ctx.defer()
     
+    try:
+        if not validators.url(url):
+            await ctx.respond(content="Invalid URL provided.")
+            return
+    except Exception as e:
+        await ctx.respond(content=f"Error validating URL: {str(e)}", ephemeral=True)
+        return
+    
     ydl = youtube_dl.YoutubeDL()
-    info = ydl.extract_info(url, download=False)
+    try:
+        info = ydl.extract_info(url, download=False)
+    except youtube_dl.DownloadError:
+        await ctx.respond(content="Error extracting info from the URL.", ephemeral=True)
+        return
+    
     if end is None:
         end = info['duration']
     title = info['title']
 
+    title += f"_{uuid.uuid4()}"
+    
+    # Validate begin and end times
+    if begin < 0 or end < 0 or begin > end or end > info['duration']:
+        await ctx.respond(content="Invalid begin or end time.", ephemeral=True)
+        return
+    
     # use youtube-dl to download the audio file from the url and trim it to the specified time range
     ydl_opts = {
         'format': 'bestaudio/best',
-        'outtmpl': '%(title)s.%(ext)s', #'%(title)s.%(id)s.%(ext)s',
+        'outtmpl': f'{title}.%(ext)s',
         'restrictfilenames': True,
         'noplaylist': True,
         'quiet': True,
@@ -129,18 +152,30 @@ async def dl_trim(ctx,
         }],
     }
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+        try:
+            ydl.download([url])
+        except youtube_dl.DownloadError:
+            await ctx.respond(content="Error downloading the audio file.", ephemeral=True)
+            return
 
     # run the ffmpeg command to trim the audio file "ffmpeg -i Shoyu.opus -ab 189k -ss 8.0 -t 110.0 -acodec libopus Shoyu.ogg"
-    subprocess.run(['ffmpeg', '-i', f'{title}.opus', '-ab', '189k', '-ss', str(begin), '-t', str(end-begin), '-acodec', 'libopus', f'{title}.ogg'])
+    try:
+        subprocess.run(['ffmpeg', '-i', f'{title}.opus', '-ab', '189k', '-ss', str(begin), '-t', str(end-begin), '-acodec', 'libopus', f'{title}.ogg'], check=True)
+    except subprocess.CalledProcessError:
+        await ctx.respond(content="Error trimming the audio file.", ephemeral=True)
+        return
 
-    os.remove(f'{title}.opus')
+    audio_file = Path(f'{title}.opus')
+    if audio_file.is_file():
+        audio_file.unlink()
     
     # send the audio file
     await ctx.respond(content="Here's your audio! Enjoy! 🎵", file=discord.File(f'{title}.ogg'))
 
     # delete the audio file
-    os.remove(f'{title}.ogg')
+    audio_file = Path(f'{title}.ogg')
+    if audio_file.is_file():
+        audio_file.unlink()
 
 
 
