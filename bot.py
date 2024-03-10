@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 import uuid
 import validators
@@ -9,35 +10,43 @@ import os
 import yt_dlp as youtube_dl
 import subprocess
 
-
 make_ephemeral = False
 
 # Load the environment variables from .env file
 load_dotenv()
 
 # Create a new bot instance
-intents = discord.Intents.all()
+intents = discord.Intents()
 intents.members = True
-intents.integrations = True
-intents.dm_typing = True
-intents.dm_reactions = True
-intents.dm_messages = True
-intents.moderation = False
 intents.message_content = True
 
-bot = commands.Bot(command_prefix='?', intents=intents, sync_commands=True, help_command=None)
+bot = commands.Bot(intents=intents, sync_commands=False, help_command=None)
 
+# Create a logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Create a file handler and set the log level
+file_handler = logging.FileHandler('bot.log')
+file_handler.setLevel(logging.INFO)
+
+# Create a formatter and add it to the file handler
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+
+# Add the file handler to the logger
+logger.addHandler(file_handler)
 
 @bot.event
 async def on_ready():
     """
     Event triggered when the bot is ready.
     """
-    print(f'Logged in as {bot.user.name}')
-    print(f'ID: {bot.user.id}')
+    logger.info(f'Logged in as {bot.user.name}')
+    logger.info(f'ID: {bot.user.id}')
 
     # Set the activity
-    await bot.change_presence(activity=discord.Game(name="/help"))
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.playing, name="/help"))
 
     # delete all commands and recreate them
     await bot.sync_commands()
@@ -47,7 +56,7 @@ async def ping(ctx):
     """
     Command to check if the bot is online.
     """
-    print(f"{ctx.author} used /ping command in {ctx.channel} on {ctx.guild}.")
+    logger.info(f"{ctx.author} used /ping command in {ctx.channel} on {ctx.guild}.")
     await ctx.respond(f'Pong! {round(bot.latency * 1000)}ms', ephemeral=make_ephemeral)
 
 @bot.slash_command()
@@ -55,7 +64,7 @@ async def about(ctx):
     """
     Command to display information about the bot.
     """
-    print(f"{ctx.author} used /about command in {ctx.channel} on {ctx.guild}.")
+    logger.info(f"{ctx.author} used /about command in {ctx.channel} on {ctx.guild}.")
 
     # Create an embed
     embed = discord.Embed(title="About the bot")
@@ -75,13 +84,13 @@ async def about(ctx):
 
     # Add the button row to the embed
     await ctx.respond(embed=embed, view=row, ephemeral=make_ephemeral)
-    
+
 @bot.slash_command(name="help")
 async def help(ctx):
     """
     Command to display the help message.
     """
-    print(f"{ctx.author} used /help command in {ctx.channel} on {ctx.guild}.")
+    logger.info(f"{ctx.author} used /help command in {ctx.channel} on {ctx.guild}.")
 
     # Create an embed
     embed = discord.Embed(title="Help")
@@ -99,17 +108,17 @@ async def help(ctx):
 
 @bot.slash_command(name="dl_trim", description="Plays audio from a URL at a specific time")
 async def dl_trim(ctx,
-                   url: str = discord.commands.Option(name="audio_url", description="The audio file URL", required=True),
-                   begin: float = discord.commands.option(name="start_time", description="The time to start playing the audio in seconds", default=0.0),
-                   end: float = discord.commands.option(name="end_time", description="The time to stop playing the audio in seconds", default=None)):
+                   url: str = discord.Option(name="audio_url", description="The audio file URL", required=True),
+                   begin: float = discord.Option(name="start_time", description="The time to start playing the audio in seconds", default=0.0),
+                   end: float = discord.Option(name="end_time", description="The time to stop playing the audio in seconds", default=None)):
     """
     Command to play audio from a URL at a specific time.
     """
-    print(f"{ctx.author} used /dl_trim command in {ctx.channel} on {ctx.guild}.")
-    
+    logger.info(f"{ctx.author} used /dl_trim command in {ctx.channel} on {ctx.guild}.")
+
     # acknowledge the command without sending a response
     await ctx.defer()
-    
+
     try:
         if not validators.url(url):
             await ctx.respond(content="Invalid URL provided.")
@@ -117,25 +126,32 @@ async def dl_trim(ctx,
     except Exception as e:
         await ctx.respond(content=f"Error validating URL: {str(e)}", ephemeral=True)
         return
-    
+
     ydl = youtube_dl.YoutubeDL()
     try:
         info = ydl.extract_info(url, download=False)
     except youtube_dl.DownloadError:
         await ctx.respond(content="Error extracting info from the URL.", ephemeral=True)
         return
-    
+
     if end is None:
         end = info['duration']
     title = info['title']
 
     title += f"_{uuid.uuid4()}"
-    
+
     # Validate begin and end times
-    if begin < 0 or end < 0 or begin > end or end > info['duration']:
+    try:
+        begin = float(begin)
+        end = float(end)
+    except ValueError:
         await ctx.respond(content="Invalid begin or end time.", ephemeral=True)
         return
-    
+
+    if begin < 0.0 or end < 0.0 or begin > end or end > info['duration']:
+        await ctx.respond(content="Invalid begin or end time.", ephemeral=True)
+        return
+
     # use youtube-dl to download the audio file from the url and trim it to the specified time range
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -160,7 +176,8 @@ async def dl_trim(ctx,
 
     # run the ffmpeg command to trim the audio file "ffmpeg -i Shoyu.opus -ab 189k -ss 8.0 -t 110.0 -acodec libopus Shoyu.ogg"
     try:
-        subprocess.run(['ffmpeg', '-i', f'{title}.opus', '-ab', '189k', '-ss', str(begin), '-t', str(end-begin), '-acodec', 'libopus', f'{title}.ogg'], check=True)
+        subprocess.run(['ffmpeg', '-i', f'{title}.opus', '-ab', '189k', '-ss', str(begin), '-t', str(end - begin),
+                        '-acodec', 'libopus', f'{title}.ogg'], check=True)
     except subprocess.CalledProcessError:
         await ctx.respond(content="Error trimming the audio file.", ephemeral=True)
         return
@@ -168,7 +185,7 @@ async def dl_trim(ctx,
     audio_file = Path(f'{title}.opus')
     if audio_file.is_file():
         audio_file.unlink()
-    
+
     # send the audio file
     await ctx.respond(content="Here's your audio! Enjoy! 🎵", file=discord.File(f'{title}.ogg'))
 
@@ -178,10 +195,7 @@ async def dl_trim(ctx,
         audio_file.unlink()
 
 
-
-
-
- # Cooldown Management
+# Cooldown Management
 @bot.event
 async def on_application_command_error(ctx, error):
     if isinstance(error, commands.CommandOnCooldown):
