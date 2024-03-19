@@ -1,9 +1,10 @@
+import asyncio
 import logging
 from pathlib import Path
 import uuid
 import validators
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord.ui import Button, View
 from dotenv import load_dotenv
 import os
@@ -21,7 +22,8 @@ intents = discord.Intents()
 intents.members = True
 intents.message_content = True
 
-bot = commands.Bot(intents=intents, sync_commands=False, help_command=None)
+bot = commands.AutoShardedBot(intents=intents, sync_commands=False, help_command=None)
+
 
 # Create a logger with timestamp in the file name
 
@@ -41,6 +43,15 @@ file_handler.setFormatter(formatter)
 # Add the file handler to the logger
 logger.addHandler(file_handler)
 
+activity: str = "/help"
+
+@bot.event
+async def on_command_error(ctx, error):
+    """
+    Event triggered when a command fails.
+    """
+    logger.error(f"Command {ctx.command} failed with error: {str(error)}")
+
 @bot.event
 async def on_ready():
     """
@@ -49,11 +60,33 @@ async def on_ready():
     logger.info(f'Logged in as {bot.user.name}')
     logger.info(f'ID: {bot.user.id}')
 
-    # Set the activity
-    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.playing, name="/help"))
+    activity = "/help"
+
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.playing, name=activity))
 
     # delete all commands and recreate them
     await bot.sync_commands()
+
+@tasks.loop(minutes=1)
+async def change_activity():
+    """
+    Change the bot's activity every 60 seconds.
+    """
+    # Set the activity
+    global activity # make 'activity' a global variable so it can be accessed by the function
+
+    
+    if activity == "/help":
+        activity = "Having fun"
+    elif activity == "Having fun":
+        activity = "Nya"
+    elif activity == "Nya":
+        activity = "/help"
+
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.playing, name=activity))
+
+change_activity.start()
+
 
 @bot.slash_command()
 async def ping(ctx):
@@ -171,41 +204,44 @@ async def dl_trim(ctx,
             'preferredquality': '192',
         }],
     }
+    loop = asyncio.get_event_loop()
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         try:
-            ydl.download([url])
-        except youtube_dl.DownloadError:
-            await ctx.respond(content="Error downloading the audio file.", ephemeral=True)
+            await loop.run_in_executor(None, lambda: ydl.download([url]))
+        except youtube_dl.DownloadError as e:
+            await ctx.respond(content=f"Error downloading the audio file: {e}", ephemeral=True)
             return
 
-    # run the ffmpeg command to trim the audio file "ffmpeg -i Shoyu.opus -ab 189k -ss 8.0 -t 110.0 -acodec libopus Shoyu.ogg"
-    try:
-        subprocess.run(['ffmpeg', '-i', f'{title}.opus', '-ab', '189k', '-ss', str(begin), '-t', str(end - begin),
-                        '-acodec', 'libopus', f'{title}.ogg'], check=True)
-    except subprocess.CalledProcessError:
-        await ctx.respond(content="Error trimming the audio file.", ephemeral=True)
+    # Run ffmpeg using asyncio.create_subprocess_exec
+    ffmpeg_cmd = ['ffmpeg', '-i', f'{title}.opus', '-ab', '189k', '-ss', str(begin), '-t', str(end - begin), '-acodec', 'libopus', f'{title}.ogg']
+    process = await asyncio.create_subprocess_exec(*ffmpeg_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    stdout, stderr = await process.communicate()
+
+    if process.returncode != 0:
+        # Handle the error if ffmpeg failed
+        await ctx.respond(content=f"Error trimming the audio file: {stderr.decode()}", ephemeral=True)
         return
 
-    audio_file = Path(f'{title}.opus')
-    if audio_file.is_file():
-        audio_file.unlink()
+    # Send the audio file
+    try:
+        await ctx.respond(content="Here's your audio! Enjoy! 🎵", file=discord.File(f'{title}.ogg'))
+    finally:
+        # Clean up files
+        for extension in ['.opus', '.ogg']:
+            audio_file = Path(f'{title}{extension}')
+            if audio_file.is_file():
+                audio_file.unlink()
 
-    # send the audio file
-    await ctx.respond(content="Here's your audio! Enjoy! 🎵", file=discord.File(f'{title}.ogg'))
+@bot.slash_command(name="create", description="Create a custom glyph")
+async def create(ctx: commands.Context, name: str = discord.Option(name="name", description="The name of the custom glyph", required=True)):
+    """
+    Command to create a custom glyph
+    """
+    logger.info(f"{ctx.author} used /create command in {ctx.channel} on {ctx.guild}.")
 
-    # delete the audio file
-    audio_file = Path(f'{title}.ogg')
-    if audio_file.is_file():
-        audio_file.unlink()
+    # acknowledge the command without sending a response
+    await ctx.respond(content="Not done yet...")
 
-
-# Cooldown Management
-@bot.event
-async def on_application_command_error(ctx, error):
-    if isinstance(error, commands.CommandOnCooldown):
-        await ctx.send(error)
-    else:
-        raise error
 
 # Run the bot
 bot.run(os.getenv('BOT_TOKEN'))
