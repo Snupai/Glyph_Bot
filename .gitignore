@@ -2,4 +2,7 @@
 .env
 bot*.log
 filebin_client/__pycache__
+filebin_client/api/__pycache__
+filebin_client/api/bin_/__pycache__
+filebin_client/api/file/__pycache__
 subclasses/__pycache__
