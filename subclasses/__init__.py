@@ -1,4 +1,3 @@
-import filebin
-import glyph_tools
+from .filebin import *
+from .glyph_tools import *
 
-__all__ = ["filebin", "glyph_tools"]
