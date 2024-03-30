@@ -79,7 +79,7 @@ async def get_files_in_bin(bin):
     return filenames
 
 
-async def check_for_glyph_files_in_bin(bin):
+async def check_for_glyph_or_txt_files_in_bin(bin):
     files = await get_files_in_bin(bin)
     if len(files) == 0:
         return False
@@ -89,6 +89,15 @@ async def check_for_glyph_files_in_bin(bin):
         elif file.endswith('.txt'):
             return True
     return False
+
+async def check_for_nglyph_file_in_bin(bin):
+    files = await get_files_in_bin(bin)
+    if len(files) == 0:
+        return False
+    for file in files:
+        if file.endswith('.nglyph'):
+            return True
+    return False 
 
 async def is_bin_empty(bin):
     _client = Client(base_url=base_url, headers={'accept': 'application/json'})
@@ -121,3 +130,24 @@ async def lock_filebin(bin):
     )
 
     print(f'Locked bin: {bin}')
+
+async def download_file_from_bin(bin, filename):
+    _client = Client(base_url=base_url, headers={'accept': 'application/json'})
+
+    result = get_bin_filename.sync_detailed(
+        bin_=bin,
+        filename=filename,
+        client=_client
+    )
+    location = result.headers['location']
+    print(location)
+    
+    # get request at location and write to file
+    async with _client.get_async_httpx_client() as client:
+        async with client.stream('GET', location) as response:
+            with open(filename, 'wb') as f:
+                async for chunk in response.aiter_bytes():
+                    f.write(chunk)
+
+    # return filename and path
+    return filename
