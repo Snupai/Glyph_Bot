@@ -1,3 +1,5 @@
 .venv
 .env
 bot*.log
+filebin_client/__pycache__
+subclasses/__pycache__
