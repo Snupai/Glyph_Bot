@@ -4,13 +4,14 @@ from pathlib import Path
 import uuid
 import validators
 import discord
+from discord.interactions import Interaction
 from discord.ext import commands, tasks
 from discord.ui import Button, View
 from dotenv import load_dotenv
 import os
 import yt_dlp as youtube_dl
-import subprocess
 import datetime
+from subclasses import filebin, glyph_tools
 
 make_ephemeral = False
 
@@ -144,7 +145,7 @@ async def help(ctx):
     await ctx.respond(embed=embed, ephemeral=make_ephemeral)
 
 @bot.slash_command(name="dl_trim", description="Plays audio from a URL at a specific time")
-async def dl_trim(ctx,
+async def dl_trim(ctx: discord.ApplicationContext,
                    url: str = discord.Option(name="audio_url", description="The audio file URL", required=True),
                    begin: float = discord.Option(name="start_time", description="The time to start playing the audio in seconds", default=0.0),
                    end: float = discord.Option(name="end_time", description="The time to stop playing the audio in seconds", default=None)):
@@ -232,12 +233,94 @@ async def dl_trim(ctx,
             if audio_file.is_file():
                 audio_file.unlink()
 
-@bot.slash_command(name="create", description="Create a custom glyph")
-async def create(ctx: commands.Context, name: str = discord.Option(name="name", description="The name of the custom glyph", required=True)):
+
+class FileBinButtons(discord.ui.View):
+    def __init__(self, url: str, bin: str):
+        super().__init__()
+        self._url = url
+        self._bin = bin
+
+        # Dynamically adding a button with a fixed URL
+        self.add_item(discord.ui.Button(label="Upload here", style=discord.ButtonStyle.link, url=self._url))
+
+    # Static custom_id for demonstration
+    @discord.ui.button(label="Confirm", style=discord.ButtonStyle.primary, custom_id="confirm_bin")
+    async def delete_button(self, button: discord.ui.Button, interaction: discord.Interaction):
+        if await filebin.check_for_glyph_files_in_bin(self._bin):
+            await interaction.response.send_message(content=f"Your filebin ({self._bin}) upload has been confirmed.", ephemeral=True)
+            await filebin.lock_filebin(self._bin)
+            # lock the confirm button so it can't be clicked again
+            button.disabled = True
+        else:
+            await interaction.response.send_message(content=f"Your filebin ({self._bin}) upload was not confirmed. Please try again.", ephemeral=True)
+
+
+
+
+
+
+@bot.slash_command(name="create", description="Create a custom glyph without adding it to the database")
+async def create(ctx: discord.ApplicationContext, 
+                 name: str = discord.Option(name="name", description="The name of the custom glyph", required=True), 
+                 url: str = discord.Option(name="url", description="The youtube URL of the audio", required=True),
+                 begin: float = discord.Option(name="start_time", description="The time to start playing the audio in seconds", default=0.0),
+                 end: float = discord.Option(name="end_time", description="The time to stop playing the audio in seconds", default=None),
+                 watermark: str = discord.Option(name="watermark", description="The watermark to add to the audio", default="")):
     """
     Command to create a custom glyph
     """
-    logger.info(f"{ctx.author} used /create command in {ctx.channel} on {ctx.guild}.")
+    logger.info(f"{ctx.author.name} used /create command in {ctx.channel} on {ctx.guild}.")
+
+    await ctx.respond(content="Not done yet...")
+
+    new_bin = await filebin.create_filebin()
+    filebin_url = f'https://filebin.net/{new_bin}'
+    if filebin_url is None:
+        await ctx.respond(content="Error creating filebin link. Please try again later.", ephemeral=True)
+        return
+    
+    row = discord.ui.View()
+
+    button_url = discord.ui.Button(
+        style=discord.ButtonStyle.link, 
+        url=filebin_url, 
+        label="Upload here"
+    )
+
+    button_confirm = discord.ui.Button(
+        style=discord.ButtonStyle.green,
+        label="Confirm",
+        custom_id="confirm_glyph_upload"
+    )
+
+    row.add_item(button_url)
+    row.add_item(button_confirm)
+    row.timeout = 60
+    row.disable_on_timeout = True
+
+    view = FileBinButtons(url=filebin_url, bin=new_bin)
+    
+    await ctx.respond(content=f"Created custom filebin: {filebin_url}", view=view, ephemeral=True)
+
+
+
+@bot.slash_command(name="upload", description="Create and upload a custom glyph to the database")
+async def upload(ctx: discord.ApplicationContext, name: str = discord.Option(name="name", description="The name of the custom glyph", required=True)):
+    """
+    Command to create and upload a custom glyph
+    """
+    logger.info(f"{ctx.author} used /upload command in {ctx.channel} on {ctx.guild}.")
+
+    # acknowledge the command without sending a response
+    await ctx.respond(content="Not done yet...")
+
+
+@bot.slash_command(name="search", description="Search our database for a custom glyph")
+async def search(ctx: discord.ApplicationContext, name: str = discord.Option(name="name", description="The name of the custom glyph", required=True)):
+    """
+    Command to search our database for a custom glyph
+    """
+    logger.info(f"{ctx.author} used /search command in {ctx.channel} on {ctx.guild}.")
 
     # acknowledge the command without sending a response
     await ctx.respond(content="Not done yet...")
