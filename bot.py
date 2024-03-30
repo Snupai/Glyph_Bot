@@ -233,26 +233,47 @@ async def dl_trim(ctx: discord.ApplicationContext,
             if audio_file.is_file():
                 audio_file.unlink()
 
+# when a button interaction times out remove the buttons
+@bot.event
+async def on_button_timeout(interaction: discord.Interaction):
+    await interaction.message.edit(view=None)
 
 class FileBinButtons(discord.ui.View):
-    def __init__(self, url: str, bin: str):
+    def __init__(self, url: str, bin: str, title: str, yt_url: str, begin: float, end: float, watermark: str, user: str):
         super().__init__()
-        self._url = url
-        self._bin = bin
-
+        self.url = url
+        self.bin = bin
+        self.disable_on_timeout = True
+        self.timeout = 60
         # Dynamically adding a button with a fixed URL
-        self.add_item(discord.ui.Button(label="Upload here", style=discord.ButtonStyle.link, url=self._url))
+        self.add_item(discord.ui.Button(label="Upload here", style=discord.ButtonStyle.link, url=self.url))
+
+    button_pressed = False
 
     # Static custom_id for demonstration
-    @discord.ui.button(label="Confirm", style=discord.ButtonStyle.primary, custom_id="confirm_bin")
+    @discord.ui.button(label="Confirm", style=discord.ButtonStyle.green, custom_id="confirm_bin", row=0)
     async def delete_button(self, button: discord.ui.Button, interaction: discord.Interaction):
-        if await filebin.check_for_glyph_files_in_bin(self._bin):
-            await interaction.response.send_message(content=f"Your filebin ({self._bin}) upload has been confirmed.", ephemeral=True)
-            await filebin.lock_filebin(self._bin)
-            # lock the confirm button so it can't be clicked again
+        if self.button_pressed:
+            await interaction.response.send_message("Already confirmed.", ephemeral=True, delete_after=10)
+            return
+
+        self.button_pressed = True
+
+        if await filebin.check_for_nglyph_file_in_bin(self.bin):
+            await interaction.response.send_message(content=f"<:glyphSuccess:1223680541614801007> Your filebin ({self.bin}) upload has been confirmed.", ephemeral=True, delete_after=15)
+            await filebin.lock_filebin(self.bin)
             button.disabled = True
+            files = await filebin.get_files_in_bin(self.bin)
+            for file in files:
+                if file.endswith('.nglyph'):
+                    filename = await filebin.download_file_from_bin(self.bin, file)
+            # copy file to new 
+            
         else:
-            await interaction.response.send_message(content=f"Your filebin ({self._bin}) upload was not confirmed. Please try again.", ephemeral=True)
+            await interaction.response.send_message(content=f"<:glyphError:1223680333820596294> Your filebin ({self.bin}) upload was not confirmed. Please try again.", ephemeral=True, delete_after=15)
+            self.button_pressed = False
+
+        await filebin.delete_filebin(self.bin)
 
 
 
@@ -261,7 +282,7 @@ class FileBinButtons(discord.ui.View):
 
 @bot.slash_command(name="create", description="Create a custom glyph without adding it to the database")
 async def create(ctx: discord.ApplicationContext, 
-                 name: str = discord.Option(name="name", description="The name of the custom glyph", required=True), 
+                 title: str = discord.Option(name="title", description="The title of the custom glyph", required=True), 
                  url: str = discord.Option(name="url", description="The youtube URL of the audio", required=True),
                  begin: float = discord.Option(name="start_time", description="The time to start playing the audio in seconds", default=0.0),
                  end: float = discord.Option(name="end_time", description="The time to stop playing the audio in seconds", default=None),
@@ -271,34 +292,16 @@ async def create(ctx: discord.ApplicationContext,
     """
     logger.info(f"{ctx.author.name} used /create command in {ctx.channel} on {ctx.guild}.")
 
-    await ctx.respond(content="Not done yet...")
+    # acknowledge the command without sending a response
+    await ctx.defer(ephemeral=True) 
 
-    new_bin = await filebin.create_filebin()
+    new_bin = await filebin.create_filebin(title=title)
     filebin_url = f'https://filebin.net/{new_bin}'
-    if filebin_url is None:
+    if new_bin is None:
         await ctx.respond(content="Error creating filebin link. Please try again later.", ephemeral=True)
         return
-    
-    row = discord.ui.View()
 
-    button_url = discord.ui.Button(
-        style=discord.ButtonStyle.link, 
-        url=filebin_url, 
-        label="Upload here"
-    )
-
-    button_confirm = discord.ui.Button(
-        style=discord.ButtonStyle.green,
-        label="Confirm",
-        custom_id="confirm_glyph_upload"
-    )
-
-    row.add_item(button_url)
-    row.add_item(button_confirm)
-    row.timeout = 60
-    row.disable_on_timeout = True
-
-    view = FileBinButtons(url=filebin_url, bin=new_bin)
+    view = FileBinButtons(url=filebin_url, bin=new_bin, title=title, yt_url=url, begin=begin, end=end, watermark=watermark, user=ctx.author.id)
     
     await ctx.respond(content=f"Created custom filebin: {filebin_url}", view=view, ephemeral=True)
 
