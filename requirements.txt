@@ -1,4 +1,6 @@
 python-dotenv
 py-cord
+py-cord[speed]
 yt_dlp
 validators
+httpx
