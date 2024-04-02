@@ -7,19 +7,19 @@ import os
 
 #TODO:implement database shit
 
-def insert_data(Title, Youtube_Link, Timestamp, Phone, Creator, Compressed_Glyphdata):
+def insert_data(Title, Youtube_Link, Timestamp, Phone, Creator, Creator_ID, Compressed_Glyphdata):
     # Connect to the database
     conn = sqlite3.connect('Custom_Glyphs.db')
     cursor = conn.cursor()
 
     # Prepare the SQL statement
     insert_sql = '''
-    INSERT INTO Custom_Glyphs (Title, Youtube_Link, Timestamp, Phone, Creator, Compressed_Glyphdata)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO Custom_Glyphs (Title, Youtube_Link, Timestamp, Phone, Creator, Creator_ID, Compressed_Glyphdata)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
     '''
 
     # Execute the SQL statement with the values
-    cursor.execute(insert_sql, (Title, Youtube_Link, Timestamp, Phone, Creator, Compressed_Glyphdata))
+    cursor.execute(insert_sql, (Title, Youtube_Link, Timestamp, Phone, Creator, Creator_ID, Compressed_Glyphdata))
 
     # Commit and close the connection
     conn.commit()
@@ -40,7 +40,7 @@ def get_data_by_ID(entry_id):
 
     # Extract the file
     if result is not None:
-        file_data = result[6]
+        file_data = result[7]
 
         # Create folder
         folder_name = str(entry_id)
@@ -75,9 +75,10 @@ def get_data_by_Title(Title):
         print("Timestamp:", result[3])
         print("Phone:", result[4])
         print("Creator:", result[5])
+        print("Creator_ID:", result[6])
 
         # Extract the file
-        file_data = result[6]
+        file_data = result[7]
 
         # Create folder
         folder_name = str(result[0])
