@@ -243,12 +243,21 @@ class FileBinButtons(discord.ui.View):
         super().__init__()
         self.url = url
         self.bin = bin
+        self.title = title
+        self.yt_url = yt_url
+        self.begin = begin
+        self.end = end
+        self.watermark = watermark
+        self.user = user
+        user_name_parts = user.rsplit('#', 1)[0].rsplit('#', 1)[0].split('#')
+        self.user_name = ''.join(user_name_parts[:-1])
+        self.user_id = int(user.split('#')[-1])
         self.disable_on_timeout = True
         self.timeout = 60
+        self.button_pressed = False
         # Dynamically adding a button with a fixed URL
         self.add_item(discord.ui.Button(label="Upload here", style=discord.ButtonStyle.link, url=self.url))
 
-    button_pressed = False
 
     # Static custom_id for demonstration
     @discord.ui.button(label="Confirm", style=discord.ButtonStyle.green, custom_id="confirm_bin", row=0)
@@ -260,7 +269,7 @@ class FileBinButtons(discord.ui.View):
         self.button_pressed = True
 
         if await filebin.check_for_nglyph_file_in_bin(self.bin):
-            await interaction.response.send_message(content=f"<:glyphSuccess:1223680541614801007> Your filebin ({self.bin}) upload has been confirmed.", ephemeral=True, delete_after=15)
+            await interaction.response.send_message(content=f"<:glyphSuccess:1223680541614801007> <@{self.user_id}> your filebin ({self.bin}) upload has been confirmed.", ephemeral=True, delete_after=15)
             await filebin.lock_filebin(self.bin)
             button.disabled = True
             files = await filebin.get_files_in_bin(self.bin)
@@ -270,7 +279,7 @@ class FileBinButtons(discord.ui.View):
             # copy file to new 
             
         else:
-            await interaction.response.send_message(content=f"<:glyphError:1223680333820596294> Your filebin ({self.bin}) upload was not confirmed. Please try again.", ephemeral=True, delete_after=15)
+            await interaction.response.send_message(content=f"<:glyphError:1223680333820596294> <@{self.user_id}> your filebin ({self.bin}) upload was not confirmed. Please try again.", ephemeral=True, delete_after=15)
             self.button_pressed = False
 
         await filebin.delete_filebin(self.bin)
@@ -301,7 +310,7 @@ async def create(ctx: discord.ApplicationContext,
         await ctx.respond(content="Error creating filebin link. Please try again later.", ephemeral=True)
         return
 
-    view = FileBinButtons(url=filebin_url, bin=new_bin, title=title, yt_url=url, begin=begin, end=end, watermark=watermark, user=ctx.author.id)
+    view = FileBinButtons(url=filebin_url, bin=new_bin, title=title, yt_url=url, begin=begin, end=end, watermark=watermark, user=f'{ctx.author.name}#{ctx.author.id}')
     
     await ctx.respond(content=f"Created custom filebin: {filebin_url}", view=view, ephemeral=True)
 
