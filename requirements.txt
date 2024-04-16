@@ -1,6 +1,5 @@
 python-dotenv
-py-cord
-py-cord[speed]
+git+https://github.com/Pycord-Development/pycord@feat/ua
 yt_dlp
 validators
 httpx
