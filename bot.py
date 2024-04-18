@@ -25,24 +25,43 @@ intents.message_content = True
 
 bot = commands.AutoShardedBot(intents=intents, sync_commands=False, help_command=None)
 
+timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
 # Create a logger with timestamp in the file name
+def setup_logger():
+    """
+    Setup the logger.
+    """
+    log_file = f"bot_{timestamp}.log"
+    logger = logging.getLogger('bot.py')
+    logger.setLevel(logging.INFO)
 
-timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-log_file = f"bot_{timestamp}.log"
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+    # Create a file handler and set the log level
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setLevel(logging.INFO)
 
-# Create a file handler and set the log level
-file_handler = logging.FileHandler(log_file)
-file_handler.setLevel(logging.INFO)
+    # Create a formatter and add it to the file handler
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
 
-# Create a formatter and add it to the file handler
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
+    # Add the file handler to the logger
+    logger.addHandler(file_handler)
 
-# Add the file handler to the logger
-logger.addHandler(file_handler)
+    return logger
+
+logger = setup_logger()
+
+# load all cogs within the cogs directory
+for filename in os.listdir('./cogs'):
+    if filename.endswith('.py'):
+        try:
+            bot.load_extension(f'cogs.{filename[:-3]}')
+            logger.info(f"Loaded extension: {filename}")
+        except Exception as e:
+            logger.error(f"Failed to load extension: {filename}")
+            logger.error(f"Error: {str(e)}")
+            print(f"Error loading extension: {filename}")
+            print(f"Error: {str(e)}")
 
 activity: str = "/help"
 
@@ -87,62 +106,6 @@ async def change_activity():
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.playing, name=activity))
 
 change_activity.start()
-
-
-@bot.slash_command()
-async def ping(ctx):
-    """
-    Command to check if the bot is online.
-    """
-    logger.info(f"{ctx.author} used /ping command in {ctx.channel} on {ctx.guild}.")
-    await ctx.respond(f'Pong! {round(bot.latency * 1000)}ms', ephemeral=make_ephemeral)
-
-@bot.slash_command()
-async def about(ctx):
-    """
-    Command to display information about the bot.
-    """
-    logger.info(f"{ctx.author} used /about command in {ctx.channel} on {ctx.guild}.")
-
-    # Create an embed
-    embed = discord.Embed(title="About the bot")
-    embed.description = "This discord bot is an easy interface for the Custom Glyph tools. It uses the scripts created by <@429776328833761280> to create and visualize custom glyphs. You can find the source code for the tools at the following links:"
-    embed.set_footer(text="Click a button to navigate to the according Github Repo.")
-
-    # Create a button row
-    row = View()
-
-    # Create buttons
-    button1 = Button(style=discord.ButtonStyle.primary, label="SebiAi/custom-nothing-glyph-tools", url="https://github.com/SebiAi/custom-nothing-glyph-tools", emoji="🔧")
-    button2 = Button(style=discord.ButtonStyle.primary, label="SebiAi/GlyphVisualizer", url="https://github.com/SebiAi/GlyphVisualizer", emoji="🔍")
-
-    # Add buttons to the row
-    row.add_item(button1)
-    row.add_item(button2)
-
-    # Add the button row to the embed
-    await ctx.respond(embed=embed, view=row, ephemeral=make_ephemeral)
-
-@bot.slash_command(name="help")
-async def help(ctx):
-    """
-    Command to display the help message.
-    """
-    logger.info(f"{ctx.author} used /help command in {ctx.channel} on {ctx.guild}.")
-
-    # Create an embed
-    embed = discord.Embed(title="Help")
-    embed.description = "This bot provides an easy interface for the Custom Glyph tools. You can use the following commands to create and visualize custom glyphs:"
-    embed.add_field(name="/ping", value="Check if the bot is online.", inline=False)
-    embed.add_field(name="/about", value="Display information about the bot.", inline=False)
-    embed.add_field(name="/create", value="Create a custom glyph.", inline=False)
-    embed.add_field(name="/visualize", value="Visualize a custom glyph.", inline=False)
-    embed.add_field(name="/publish", value="Publish a custom glyph to our database.", inline=False)
-    embed.add_field(name="/search", value="Search for a custom glyph.", inline=False)
-    embed.add_field(name="/help", value="Display this help message.", inline=False)
-
-    # Send the embed
-    await ctx.respond(embed=embed, ephemeral=make_ephemeral)
 
 @bot.slash_command(name="dl_trim", description="Plays audio from a URL at a specific time")
 async def dl_trim(ctx: discord.ApplicationContext,
