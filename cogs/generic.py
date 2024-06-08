@@ -13,7 +13,7 @@ class GenericCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.slash_command()
+    @commands.slash_command(integration_types={discord.IntegrationType.guild_install, discord.IntegrationType.user_install})
     async def ping(self, ctx):
         """
         Command to check if the bot is online.
@@ -22,7 +22,7 @@ class GenericCog(commands.Cog):
         logger.info(f"{ctx.author} used /ping command in {ctx.channel} on {ctx.guild}.")
         await ctx.respond(f'Pong! {round(self.bot.latency * 1000)}ms', ephemeral=True)
 
-    @commands.slash_command()
+    @commands.slash_command(integration_types={discord.IntegrationType.guild_install, discord.IntegrationType.user_install})
     async def about(self, ctx):
         """
         Command to display information about the bot.
@@ -48,7 +48,7 @@ class GenericCog(commands.Cog):
         # Add the button row to the embed
         await ctx.respond(embed=embed, view=row, ephemeral=True)
 
-    @commands.slash_command(name="help")
+    @commands.slash_command(integration_types={discord.IntegrationType.guild_install, discord.IntegrationType.user_install}, name="help")
     async def help(self, ctx):
         """
         Command to display the help message.

@@ -107,7 +107,7 @@ async def change_activity():
 
 change_activity.start()
 
-@bot.slash_command(name="dl_trim", description="Plays audio from a URL at a specific time")
+@bot.slash_command(integration_types={discord.IntegrationType.guild_install, discord.IntegrationType.user_install}, name="dl_trim", description="Plays audio from a URL at a specific time")
 async def dl_trim(ctx: discord.ApplicationContext,
                    url: str = discord.Option(name="audio_url", description="The audio file URL", required=True),
                    begin: float = discord.Option(name="start_time", description="The time to start playing the audio in seconds", default=0.0),
@@ -252,7 +252,7 @@ class FileBinButtons(discord.ui.View):
 
 
 
-@bot.slash_command(name="create", description="Create a custom glyph without adding it to the database")
+@bot.slash_command(integration_types={discord.IntegrationType.guild_install, discord.IntegrationType.user_install}, name="create", description="Create a custom glyph without adding it to the database")
 async def create(ctx: discord.ApplicationContext, 
                  title: str = discord.Option(name="title", description="The title of the custom glyph", required=True), 
                  url: str = discord.Option(name="url", description="The youtube URL of the audio", required=True),
@@ -279,7 +279,7 @@ async def create(ctx: discord.ApplicationContext,
 
 
 
-@bot.slash_command(name="upload", description="Create and upload a custom glyph to the database")
+@bot.slash_command(integration_types={discord.IntegrationType.guild_install, discord.IntegrationType.user_install}, name="upload", description="Create and upload a custom glyph to the database")
 async def upload(ctx: discord.ApplicationContext, name: str = discord.Option(name="name", description="The name of the custom glyph", required=True)):
     """
     Command to create and upload a custom glyph
@@ -290,7 +290,7 @@ async def upload(ctx: discord.ApplicationContext, name: str = discord.Option(nam
     await ctx.respond(content="Not done yet...")
 
 
-@bot.slash_command(name="search", description="Search our database for a custom glyph")
+@bot.slash_command(integration_types={discord.IntegrationType.guild_install, discord.IntegrationType.user_install}, name="search", description="Search our database for a custom glyph")
 async def search(ctx: discord.ApplicationContext, name: str = discord.Option(name="name", description="The name of the custom glyph", required=True)):
     """
     Command to search our database for a custom glyph
