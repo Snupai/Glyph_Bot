@@ -96,12 +96,9 @@ async def change_activity():
     global activity # make 'activity' a global variable so it can be accessed by the function
 
     
-    if activity == "/help":
-        activity = "Having fun"
-    elif activity == "Having fun":
-        activity = "Nya"
-    elif activity == "Nya":
-        activity = "/help"
+    # Cycle through a list of activities
+    activities = ["/help", "Having fun", "Nya"]
+    activity = activities[(activities.index(activity) + 1) % len(activities)]
 
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.playing, name=activity))
 
