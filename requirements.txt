@@ -3,3 +3,4 @@ git+https://github.com/Pycord-Development/pycord@feat/ua
 yt_dlp
 validators
 httpx
+anyio>=4.4.0 # not directly required, pinned by Snyk to avoid a vulnerability
