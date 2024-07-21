@@ -1,5 +1,5 @@
 python-dotenv
-git+https://github.com/Pycord-Development/pycord@feat/ua
+py-cord
 yt_dlp
 validators
 httpx
